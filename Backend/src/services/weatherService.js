@@ -1,4 +1,6 @@
 const axios = require('axios');
+const { getCachedData, setCachedData } = require('../config/redisClient');
+const config = require('../config/config');
 
 // Data kota yang tersedia (hanya 4 kota yang diminta)
 const cities = {
@@ -66,16 +68,64 @@ const weatherService = {
     }
   },
 
-  // Get weather by city name
+  // Get weather by city name with Redis caching
   getWeatherByCity: async (cityName) => {
     try {
       const city = weatherService.getCityCoordinates(cityName);
+      
+      // Create cache key
+      const cacheKey = `weather:${cityName.toLowerCase()}`;
+      
+      // Try to get cached data first
+      const cachedData = await getCachedData(cacheKey);
+      if (cachedData) {
+        console.log(`Cache hit for ${cityName}:`, cachedData);
+        // Add city name to cached response
+        cachedData.city = city.name;
+        return cachedData;
+      }
+      
+      console.log(`Cache miss for ${cityName}, fetching from API...`);
+      
+      // Fetch fresh data from API
       const weatherData = await weatherService.fetchWeatherData(city.lat, city.lon);
+      
       // Add city name to response
       weatherData.city = city.name;
+      
+      // Cache the result
+      const ttl = parseInt(config.redis.cacheTTL) || 3600;
+      await setCachedData(cacheKey, weatherData, ttl);
+      
+      console.log(`Cached weather data for ${cityName} with TTL: ${ttl}s`);
+      
       return weatherData;
     } catch (error) {
       throw error;
+    }
+  },
+
+  // Clear cache for a specific city
+  clearCityCache: async (cityName) => {
+    const cacheKey = `weather:${cityName.toLowerCase()}`;
+    const { deleteCachedData } = require('../config/redisClient');
+    return await deleteCachedData(cacheKey);
+  },
+
+  // Clear all weather cache
+  clearAllWeatherCache: async () => {
+    const { redisClient } = require('../config/redisClient');
+    try {
+      const keys = await redisClient.keys('weather:*');
+      if (keys.length > 0) {
+        await redisClient.del(keys);
+        console.log(`Cleared ${keys.length} weather cache entries`);
+        return keys.length;
+      }
+      return 0;
+    } catch (err) {
+      console.error('Error clearing all weather cache:', err);
+      throw err;
     }
   }
 };

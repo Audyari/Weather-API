@@ -5,6 +5,12 @@ const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   weatherApiKey: process.env.WEATHER_API_KEY || 'EDWYD8W72GEEVYT8UJSJBEMEV',
   weatherApiUrl: 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline',
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379,
+    // TTL for cache in seconds (default: 1 hour)
+    cacheTTL: process.env.REDIS_CACHE_TTL || 3600
+  },
   rateLimit: {
     // General rate limit settings
     general: {
